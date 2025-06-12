@@ -1,5 +1,6 @@
 using DataAccessLayer.Abstract;
 using DataAccessLayer.Concrete.DatabaseFolder;
+using Entity.Enums;
 using Entity.Models;
 using Microsoft.EntityFrameworkCore;
 
