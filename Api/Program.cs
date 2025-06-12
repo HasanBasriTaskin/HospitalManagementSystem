@@ -44,11 +44,11 @@ builder.Services.AddDbContext<ProjectMainContext>(opt =>
 {
     if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
     {
-        opt.UseMySql(builder.Configuration["ConnectionStrings:ProjectMainContext"], new MySqlServerVersion(new Version(8, 0, 30)));
+        opt.UseSqlite(builder.Configuration["ConnectionStrings:ProjectMainContext"]);
     }
     else
     {
-        opt.UseMySql(builder.Configuration["ConnectionStrings:ProductMysqlConnection"], new MySqlServerVersion(new Version(8, 0, 0)));
+        opt.UseSqlite(builder.Configuration["ConnectionStrings:ProductSqliteConnection"]);
     }
 });
 
