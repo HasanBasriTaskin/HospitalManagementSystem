@@ -12,6 +12,8 @@ using DataAccessLayer.Concrete.DatabaseFolder.SeedData;
 using Microsoft.AspNetCore.Diagnostics;
 using System.Text.Json;
 using Entity.DTOs;
+using DataAccessLayer.Abstract;
+using DataAccessLayer.Concrete;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,14 @@ var logger = new LoggerConfiguration()
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(logger);
+
+// Add Repository and UnitOfWork Dependencies
+builder.Services.AddScoped<IDoctorRepository, DoctorRepository>();
+builder.Services.AddScoped<IPatientRepository, PatientRepository>();
+builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+builder.Services.AddScoped<IDoctorScheduleRepository, DoctorScheduleRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddCors(options =>
 {
