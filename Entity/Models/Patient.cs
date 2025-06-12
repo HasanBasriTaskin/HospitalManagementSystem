@@ -40,6 +40,9 @@ namespace Entity.Models
         [MaxLength(15)]
         public string? EmergencyPhone { get; set; }
         
+        // Audit Fields
+        public DateTime? LastVisitDate { get; set; }
+        
         // Computed Properties
         [NotMapped]
         public string FullName => $"{FirstName} {LastName}";

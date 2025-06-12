@@ -27,6 +27,12 @@ namespace Entity.Models
         [MaxLength(1000)]
         public string? Notes { get; set; }
         
+        // Audit Fields
+        public DateTime? ModifiedDate { get; set; }
+        public string? ModifiedBy { get; set; }
+        public DateTime? CancelledDate { get; set; }
+        public string? CancelledBy { get; set; }
+        
         [MaxLength(50)]
         public string CreatedBy { get; set; } = "System";
         

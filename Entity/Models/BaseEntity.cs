@@ -9,7 +9,9 @@ namespace Entity.Models
         
         public DateTime CreatedDate { get; set; } = DateTime.Now;
         
-        public DateTime? UpdatedDate { get; set; }
+        public DateTime? ModifiedDate { get; set; }
+        
+        public string? ModifiedBy { get; set; }
         
         public bool IsActive { get; set; } = true;
     }
