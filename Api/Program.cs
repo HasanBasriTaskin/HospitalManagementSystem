@@ -1,0 +1,154 @@
+using Entity.Configrations;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using System.Text;
+using Api.MiddleWares;
+using DataAccessLayer.Concrete.DatabaseFolder;
+using Microsoft.AspNetCore.Diagnostics;
+using System.Text.Json;
+using Entity.DTOs;
+
+var builder = WebApplication.CreateBuilder(args);
+
+//SeriLog Configration
+var logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .WriteTo.Console()
+    .CreateLogger();
+
+builder.Logging.ClearProviders();
+builder.Logging.AddSerilog(logger);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", builder => builder
+        .WithOrigins("http://127.0.0.1:5500", "http://192.168.1.103:5500", "http://localhost:5500", "http://localhost:3000",
+            "http://192.168.1.103:3000", "http://192.168.188.148:3000")
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials());
+});
+
+// Add services to the container.
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.Configure<CustomTokenOption>(builder.Configuration.GetSection("JWT"));
+
+builder.Services.AddDbContext<ProjectMainContext>(opt =>
+{
+    if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+    {
+        opt.UseMySql(builder.Configuration["ConnectionStrings:ProjectMainContext"], new MySqlServerVersion(new Version(8, 0, 30)));
+    }
+    else
+    {
+        opt.UseMySql(builder.Configuration["ConnectionStrings:ProductMysqlConnection"], new MySqlServerVersion(new Version(8, 0, 0)));
+    }
+});
+
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+    .AddEntityFrameworkStores<ProjectMainContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireNonAlphanumeric = false;
+
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+
+    options.Lockout.AllowedForNewUsers = true;
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedEmail = false;
+});
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = true;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["JWT:SecurityKey"])),
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true
+    };
+});
+
+builder.Services.AddMvc().ConfigureApiBehaviorOptions(options =>
+{
+    options.InvalidModelStateResponseFactory = (context) =>
+    {
+        var errors = context.ModelState.Values.SelectMany(x => x.Errors.Select(p => p.ErrorMessage)).ToList();
+        var response = Response<NoContentResult>.Fail(400, errors);
+
+        return new BadRequestObjectResult(response);
+    };
+});
+
+var app = builder.Build();
+
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        // using static System.Net.Mime.MediaTypeNames;
+        context.Response.ContentType = "application/json";// Text.Plain;
+        var errorFeature = context.Features.Get<IExceptionHandlerFeature>();
+        if (errorFeature != null)
+        {
+            var ex = errorFeature.Error;
+            var errors = new List<string>();
+            errors.Add(string.Concat(ex.Message, " ", ex.InnerException));
+            var response = Response<NoContentResult>.Fail(context.Response.StatusCode, errors);
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        }
+    });
+});
+
+app.UseMiddleware<JWTMiddleWare>();
+app.UseMiddleware<ExceptionMiddleWare>();
+app.UseCors("CorsPolicy");
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseEndpoints(opt =>
+{
+    opt.MapControllerRoute(
+        name: "auth",
+        pattern: "api/auth/{action}",
+        defaults: new { controller = "Auth", action = "Login" }
+    );
+});
+
+app.MapControllers();
+
+app.Run();

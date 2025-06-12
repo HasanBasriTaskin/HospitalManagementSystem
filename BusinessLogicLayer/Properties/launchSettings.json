@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BusinessLogicLayer": {
+      "commandName": "Project"
+    },
+    "Profile 1": {
+      "commandName": "Project"
+    }
+  }
+}
