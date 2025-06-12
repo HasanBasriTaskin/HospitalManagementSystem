@@ -8,6 +8,7 @@ using Serilog;
 using System.Text;
 using Api.MiddleWares;
 using DataAccessLayer.Concrete.DatabaseFolder;
+using DataAccessLayer.Concrete.DatabaseFolder.SeedData;
 using Microsoft.AspNetCore.Diagnostics;
 using System.Text.Json;
 using Entity.DTOs;
@@ -102,6 +103,34 @@ builder.Services.AddMvc().ConfigureApiBehaviorOptions(options =>
 });
 
 var app = builder.Build();
+
+// Create and seed the database
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ProjectMainContext>();
+        
+        // Create database if it doesn't exist
+        context.Database.EnsureCreated();
+        
+        // Apply any pending migrations
+        if (context.Database.GetPendingMigrations().Any())
+        {
+            context.Database.Migrate();
+        }
+        
+        // Seed the database
+        var seeder = new DatabaseSeeder(context);
+        await seeder.SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        var appLogger = services.GetRequiredService<ILogger<Program>>();
+        appLogger.LogError(ex, "An error occurred while creating/seeding the database.");
+    }
+}
 
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
