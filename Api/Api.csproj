@@ -32,4 +32,8 @@
     <ProjectReference Include="..\BusinessLogicLayer\BusinessLogicLayer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Logs\critical\" />
+  </ItemGroup>
+
 </Project>

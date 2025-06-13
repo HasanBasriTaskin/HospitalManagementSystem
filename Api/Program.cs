@@ -122,9 +122,6 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<ProjectMainContext>();
         
-        // Create database if it doesn't exist
-        context.Database.EnsureCreated();
-        
         // Apply any pending migrations
         if (context.Database.GetPendingMigrations().Any())
         {
