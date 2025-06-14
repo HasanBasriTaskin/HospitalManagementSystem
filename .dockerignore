@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/Properties/launchSettings.json
+.vs/
+.vscode/
+.git/
+.github/
+README.md
+*.db
+*.db-shm
+*.db-wal
+!/Api/appsettings.json
+!/Api/appsettings.Development.json 

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hospital-api-service
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Serilog__WriteTo__2__Name=Seq
+      - Serilog__WriteTo__2__Args__serverUrl=http://seq:5341
+    depends_on:
+      - seq
+
+  seq:
+    image: datalust/seq:latest
+    container_name: seq-service
+    ports:
+      - "8081:80"    # Seq UI
+      - "5341:5341"  # Seq log ingestion
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - seq-data:/data
+
+volumes:
+  seq-data: 
