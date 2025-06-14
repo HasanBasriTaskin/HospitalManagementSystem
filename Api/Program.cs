@@ -39,6 +39,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 // Add Business Logic Layer Dependencies
 builder.Services.AddScoped<IDepartmentService, DepartmentManager>();
 builder.Services.AddScoped<IDoctorService, DoctorManager>();
+builder.Services.AddScoped<IPatientService, PatientManager>();
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogicLayer.Abstact.IDepartmentService).Assembly);
