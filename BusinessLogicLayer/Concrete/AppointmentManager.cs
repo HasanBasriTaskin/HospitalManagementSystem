@@ -161,5 +161,21 @@ namespace BusinessLogicLayer.Concrete
             _unitOfWork.AppointmentRepository.Update(appointment);
             await _unitOfWork.SaveChangesAsync();
         }
+
+        public async Task<bool> HasUpcomingAppointmentsForDoctorAsync(int doctorId)
+        {
+            return await _unitOfWork.AppointmentRepository.ExistsAsync(a =>
+                a.DoctorId == doctorId &&
+                a.AppointmentDate.Date >= DateTime.Today &&
+                a.Status == AppointmentStatus.Scheduled);
+        }
+
+        public async Task<bool> HasUpcomingAppointmentsForPatientAsync(int patientId)
+        {
+            return await _unitOfWork.AppointmentRepository.ExistsAsync(a =>
+                a.PatientId == patientId &&
+                a.AppointmentDate.Date >= DateTime.Today &&
+                a.Status == AppointmentStatus.Scheduled);
+        }
     }
 } 

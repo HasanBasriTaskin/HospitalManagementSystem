@@ -13,6 +13,8 @@ namespace BusinessLogicLayer.Abstact
         Task<IEnumerable<AvailableSlotDto>> GetAvailableAppointmentSlotsAsync(int doctorId, DateTime date);
         Task<AppointmentDto> CreateAsync(AppointmentCreateDto createDto);
         Task CancelAsync(int id);
-        // Maybe an UpdateAsync for notes later
+        
+        Task<bool> HasUpcomingAppointmentsForDoctorAsync(int doctorId);
+        Task<bool> HasUpcomingAppointmentsForPatientAsync(int patientId);
     }
 } 
