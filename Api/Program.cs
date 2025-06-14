@@ -14,6 +14,8 @@ using System.Text.Json;
 using Entity.DTOs;
 using DataAccessLayer.Abstract;
 using DataAccessLayer.Concrete;
+using BusinessLogicLayer.Abstact;
+using BusinessLogicLayer.Concrete;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +35,13 @@ builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IDoctorScheduleRepository, DoctorScheduleRepository>();
 builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Add Business Logic Layer Dependencies
+builder.Services.AddScoped<IDepartmentService, DepartmentManager>();
+builder.Services.AddScoped<IDoctorService, DoctorManager>();
+
+// Add AutoMapper
+builder.Services.AddAutoMapper(typeof(BusinessLogicLayer.Abstact.IDepartmentService).Assembly);
 
 builder.Services.AddCors(options =>
 {
