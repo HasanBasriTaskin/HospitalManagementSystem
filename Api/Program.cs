@@ -41,6 +41,7 @@ builder.Services.AddScoped<IDepartmentService, DepartmentManager>();
 builder.Services.AddScoped<IDoctorService, DoctorManager>();
 builder.Services.AddScoped<IPatientService, PatientManager>();
 builder.Services.AddScoped<IDoctorScheduleService, DoctorScheduleManager>();
+builder.Services.AddScoped<IAppointmentService, AppointmentManager>();
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogicLayer.Abstact.IDepartmentService).Assembly);
