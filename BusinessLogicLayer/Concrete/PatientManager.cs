@@ -13,11 +13,13 @@ namespace BusinessLogicLayer.Concrete
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IAppointmentService _appointmentService;
 
-        public PatientManager(IUnitOfWork unitOfWork, IMapper mapper)
+        public PatientManager(IUnitOfWork unitOfWork, IMapper mapper, IAppointmentService appointmentService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _appointmentService = appointmentService;
         }
 
         public async Task<PatientDto> CreateAsync(PatientCreateDto createDto)
@@ -45,12 +47,11 @@ namespace BusinessLogicLayer.Concrete
             }
 
             // Business Rule: Check for future appointments before deleting.
-            // Will be implemented with AppointmentService.
-            // var hasUpcomingAppointments = await _unitOfWork.AppointmentRepository.ExistsAsync(a => a.PatientId == id && a.AppointmentDate >= DateTime.Today);
-            // if (hasUpcomingAppointments)
-            // {
-            //     throw new InvalidOperationException("This patient cannot be deleted, there are upcoming appointments.");
-            // }
+            var hasUpcomingAppointments = await _appointmentService.HasUpcomingAppointmentsForPatientAsync(id);
+            if (hasUpcomingAppointments)
+            {
+                throw new InvalidOperationException("This patient cannot be deleted, there are upcoming appointments.");
+            }
 
             _unitOfWork.PatientRepository.Delete(patient);
             await _unitOfWork.SaveChangesAsync();
