@@ -1,3 +1,4 @@
+using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
 using Entity.DTOs.DepartmentDtos;
@@ -13,10 +14,12 @@ namespace BusinessLogicLayer.Concrete
     public class DepartmentManager : IDepartmentService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IMapper _mapper;
 
-        public DepartmentManager(IUnitOfWork unitOfWork)
+        public DepartmentManager(IUnitOfWork unitOfWork, IMapper mapper)
         {
             _unitOfWork = unitOfWork;
+            _mapper = mapper;
         }
 
         public async Task<DepartmentDto> CreateAsync(DepartmentCreateDto createDto)
@@ -27,21 +30,12 @@ namespace BusinessLogicLayer.Concrete
                 throw new InvalidOperationException("A department with this name already exists.");
             }
 
-            var department = new Department
-            {
-                Name = createDto.Name,
-                Description = createDto.Description,
-            };
+            var department = _mapper.Map<Department>(createDto);
 
             _unitOfWork.DepartmentRepository.Add(department);
             await _unitOfWork.SaveChangesAsync();
 
-            return new DepartmentDto
-            {
-                Id = department.Id,
-                Name = department.Name,
-                Description = department.Description
-            };
+            return _mapper.Map<DepartmentDto>(department);
         }
 
         public async Task DeleteAsync(int id)
@@ -65,12 +59,7 @@ namespace BusinessLogicLayer.Concrete
         public async Task<IEnumerable<DepartmentDto>> GetAllAsync()
         {
             var departments = await _unitOfWork.DepartmentRepository.GetAllAsync();
-            return departments.Select(d => new DepartmentDto
-            {
-                Id = d.Id,
-                Name = d.Name,
-                Description = d.Description
-            });
+            return _mapper.Map<IEnumerable<DepartmentDto>>(departments);
         }
 
         public async Task<DepartmentDto> GetByIdAsync(int id)
@@ -81,12 +70,7 @@ namespace BusinessLogicLayer.Concrete
                 throw new KeyNotFoundException($"Department with ID {id} not found.");
             }
 
-            return new DepartmentDto
-            {
-                Id = department.Id,
-                Name = department.Name,
-                Description = department.Description
-            };
+            return _mapper.Map<DepartmentDto>(department);
         }
 
         public async Task UpdateAsync(DepartmentUpdateDto updateDto)
@@ -103,8 +87,7 @@ namespace BusinessLogicLayer.Concrete
                 throw new InvalidOperationException("A department with this name already exists.");
             }
 
-            department.Name = updateDto.Name;
-            department.Description = updateDto.Description;
+            _mapper.Map(updateDto, department);
             
             _unitOfWork.DepartmentRepository.Update(department);
             await _unitOfWork.SaveChangesAsync();
