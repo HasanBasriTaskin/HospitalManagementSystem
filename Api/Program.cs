@@ -121,13 +121,13 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<ProjectMainContext>();
-        
+
         // Apply any pending migrations
         if (context.Database.GetPendingMigrations().Any())
         {
             context.Database.Migrate();
         }
-        
+
         // Seed the database
         var seeder = new DatabaseSeeder(context);
         await seeder.SeedAsync();
@@ -138,26 +138,6 @@ using (var scope = app.Services.CreateScope())
         appLogger.LogError(ex, "An error occurred while creating/seeding the database.");
     }
 }
-
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-
-        // using static System.Net.Mime.MediaTypeNames;
-        context.Response.ContentType = "application/json";// Text.Plain;
-        var errorFeature = context.Features.Get<IExceptionHandlerFeature>();
-        if (errorFeature != null)
-        {
-            var ex = errorFeature.Error;
-            var errors = new List<string>();
-            errors.Add(string.Concat(ex.Message, " ", ex.InnerException));
-            var response = Response<NoContentResult>.Fail(context.Response.StatusCode, errors);
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
-        }
-    });
-});
 
 app.UseMiddleware<JWTMiddleWare>();
 app.UseMiddleware<ExceptionMiddleWare>();
