@@ -64,6 +64,16 @@ namespace Api.MiddleWares
                     _logger.LogWarning(exception, "Unauthorized access attempt");
                     break;
 
+                case KeyNotFoundException:
+                    response.StatusCode = (int)HttpStatusCode.NotFound;
+                    _logger.LogWarning(exception, "Resource not found (KeyNotFound)");
+                    break;
+
+                case InvalidOperationException:
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    _logger.LogWarning(exception, "Invalid operation");
+                    break;
+
                 case DbUpdateException:
                     response.StatusCode = (int)HttpStatusCode.InternalServerError;
                     errorResponse.Message = "A database error occurred";
