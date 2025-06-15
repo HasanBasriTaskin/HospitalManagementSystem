@@ -17,6 +17,7 @@ using DataAccessLayer.Concrete;
 using BusinessLogicLayer.Abstact;
 using BusinessLogicLayer.Concrete;
 using Entity.Models;
+using BusinessLogicLayer.Concrete.EfCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -120,7 +121,7 @@ builder.Services.AddMvc().ConfigureApiBehaviorOptions(options =>
     options.InvalidModelStateResponseFactory = (context) =>
     {
         var errors = context.ModelState.Values.SelectMany(x => x.Errors.Select(p => p.ErrorMessage)).ToList();
-        var response = Response<NoContentResult>.Fail(400, errors);
+        var response = ServiceResponse<object>.Failure(errors);
 
         return new BadRequestObjectResult(response);
     };
