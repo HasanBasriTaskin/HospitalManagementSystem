@@ -1,6 +1,7 @@
 using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
+using Entity.DTOs;
 using Entity.DTOs.DoctorDtos;
 using Entity.Models;
 using System;
@@ -23,107 +24,158 @@ namespace BusinessLogicLayer.Concrete
             _appointmentService = appointmentService;
         }
 
-        public async Task<DoctorDto> CreateAsync(DoctorCreateDto createDto)
+        public async Task<ServiceResponse<DoctorDto>> CreateAsync(DoctorCreateDto createDto)
         {
+            var validationErrors = new List<string>();
+
+            // Rule 1: Department must exist.
             var departmentExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Id == createDto.DepartmentId);
             if (!departmentExists)
             {
-                throw new KeyNotFoundException($"Department with ID {createDto.DepartmentId} not found.");
+                validationErrors.Add($"Department with ID {createDto.DepartmentId} not found.");
             }
 
+            // Rule 2: License number must be unique.
             var licenseExists = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.LicenseNumber == createDto.LicenseNumber);
             if (licenseExists)
             {
-                throw new InvalidOperationException($"A doctor with license number {createDto.LicenseNumber} already exists.");
+                validationErrors.Add($"A doctor with license number {createDto.LicenseNumber} already exists.");
             }
 
-            var doctor = _mapper.Map<Doctor>(createDto);
-
-            _unitOfWork.DoctorRepository.Add(doctor);
-            await _unitOfWork.SaveChangesAsync();
+            // Return if there are any validation errors
+            if (validationErrors.Any())
+            {
+                return ServiceResponse<DoctorDto>.Failure(validationErrors);
+            }
             
-            return await GetByIdAsync(doctor.Id);
+            try
+            {
+                var doctor = _mapper.Map<Doctor>(createDto);
+                _unitOfWork.DoctorRepository.Add(doctor);
+                await _unitOfWork.SaveChangesAsync();
+                
+                // Fetch the created doctor with department details to return
+                return await GetByIdAsync(doctor.Id);
+            }
+            catch (Exception ex)
+            {
+                return ServiceResponse<DoctorDto>.Failure($"An error occurred while creating the doctor: {ex.Message}");
+            }
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task<ServiceResponse<bool>> DeleteAsync(int id)
         {
-            var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(id);
-            if (doctor == null)
+            try
             {
-                throw new KeyNotFoundException($"Doctor with ID {id} not found.");
-            }
-
-            // Business Rule: Cannot delete a doctor with upcoming appointments.
-            var hasUpcomingAppointments = await _appointmentService.HasUpcomingAppointmentsForDoctorAsync(id);
-            if (hasUpcomingAppointments)
-            {
-                throw new InvalidOperationException("This doctor cannot be deleted because they have upcoming appointments.");
-            }
-
-            _unitOfWork.DoctorRepository.Delete(doctor);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        public async Task<IEnumerable<DoctorDto>> GetAllAsync()
-        {
-            var doctors = await _unitOfWork.DoctorRepository.GetAllAsync();
-            // Manual mapping is required here because the generic repository doesn't support Includes.
-            // This can be optimized later by enhancing the repository.
-            var doctorDtos = _mapper.Map<IEnumerable<DoctorDto>>(doctors);
-            
-            var departments = await _unitOfWork.DepartmentRepository.GetAllAsync();
-            var departmentMap = departments.ToDictionary(d => d.Id, d => d.Name);
-
-            foreach (var dto in doctorDtos)
-            {
-                if (departmentMap.TryGetValue(dto.DepartmentId, out var departmentName))
+                var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(id);
+                if (doctor == null)
                 {
-                    dto.DepartmentName = departmentName;
+                    return ServiceResponse<bool>.Failure($"Doctor with ID {id} not found.");
                 }
-            }
-            return doctorDtos;
-        }
 
-        public async Task<DoctorDto> GetByIdAsync(int id)
-        {
-            var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(id);
-            if (doctor == null)
+                // Business Rule: Cannot delete a doctor with upcoming appointments.
+                var hasUpcomingAppointments = await _appointmentService.HasUpcomingAppointmentsForDoctorAsync(id);
+                if (hasUpcomingAppointments)
+                {
+                    return ServiceResponse<bool>.Failure("This doctor cannot be deleted because they have upcoming appointments.");
+                }
+
+                _unitOfWork.DoctorRepository.Delete(doctor);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch(Exception ex)
             {
-                throw new KeyNotFoundException($"Doctor with ID {id} not found.");
+                return ServiceResponse<bool>.Failure($"An error occurred while deleting the doctor: {ex.Message}");
             }
-            
-            // Manual mapping for department name
-            var doctorDto = _mapper.Map<DoctorDto>(doctor);
-            var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(doctor.DepartmentId);
-            doctorDto.DepartmentName = department?.Name ?? "N/A";
-            
-            return doctorDto;
         }
 
-        public async Task UpdateAsync(DoctorUpdateDto updateDto)
+        public async Task<ServiceResponse<IEnumerable<DoctorDto>>> GetAllAsync()
         {
+            try
+            {
+                var doctors = await _unitOfWork.DoctorRepository.GetAllAsync();
+                var doctorDtos = _mapper.Map<IEnumerable<DoctorDto>>(doctors);
+                
+                // This part can be optimized. For now, we'll keep it to resolve department names.
+                var departments = await _unitOfWork.DepartmentRepository.GetAllAsync();
+                var departmentMap = departments.ToDictionary(d => d.Id, d => d.Name);
+
+                foreach (var dto in doctorDtos)
+                {
+                    if (departmentMap.TryGetValue(dto.DepartmentId, out var departmentName))
+                    {
+                        dto.DepartmentName = departmentName;
+                    }
+                }
+                return ServiceResponse<IEnumerable<DoctorDto>>.Success(doctorDtos);
+            }
+            catch (Exception ex)
+            {
+                return ServiceResponse<IEnumerable<DoctorDto>>.Failure($"An error occurred while retrieving doctors: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResponse<DoctorDto>> GetByIdAsync(int id)
+        {
+            try
+            {
+                var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(id);
+                if (doctor == null)
+                {
+                    return ServiceResponse<DoctorDto>.Failure($"Doctor with ID {id} not found.");
+                }
+                
+                var doctorDto = _mapper.Map<DoctorDto>(doctor);
+                var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(doctor.DepartmentId);
+                doctorDto.DepartmentName = department?.Name ?? "N/A";
+                
+                return ServiceResponse<DoctorDto>.Success(doctorDto);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<DoctorDto>.Failure($"An error occurred while retrieving the doctor: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResponse<bool>> UpdateAsync(DoctorUpdateDto updateDto)
+        {
+            var validationErrors = new List<string>();
+
             var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(updateDto.Id);
             if (doctor == null)
             {
-                throw new KeyNotFoundException($"Doctor with ID {updateDto.Id} not found.");
+                return ServiceResponse<bool>.Failure($"Doctor with ID {updateDto.Id} not found.");
             }
 
             var departmentExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Id == updateDto.DepartmentId);
             if (!departmentExists)
             {
-                throw new KeyNotFoundException($"Department with ID {updateDto.DepartmentId} not found.");
+                validationErrors.Add($"Department with ID {updateDto.DepartmentId} not found.");
             }
             
             var licenseExists = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.LicenseNumber == updateDto.LicenseNumber && d.Id != updateDto.Id);
             if (licenseExists)
             {
-                throw new InvalidOperationException($"A doctor with license number {updateDto.LicenseNumber} already exists.");
+                validationErrors.Add($"A doctor with license number {updateDto.LicenseNumber} already exists.");
+            }
+            
+            if (validationErrors.Any())
+            {
+                return ServiceResponse<bool>.Failure(validationErrors);
             }
 
-            _mapper.Map(updateDto, doctor);
-
-            _unitOfWork.DoctorRepository.Update(doctor);
-            await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                _mapper.Map(updateDto, doctor);
+                _unitOfWork.DoctorRepository.Update(doctor);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<bool>.Failure($"An error occurred while updating the doctor: {ex.Message}");
+            }
         }
     }
 } 
