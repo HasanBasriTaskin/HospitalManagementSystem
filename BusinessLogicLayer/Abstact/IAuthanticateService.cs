@@ -12,9 +12,9 @@ namespace BusinessLogicLayer.Abstact
 {
     public interface IAuthanticateService
     {
-        Task<Response<TokenDTO>> LoginAsync(LoginDTO loginDto);
-        Task<Response<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role);
-        Task<Response<TokenDTO>> RefreshTokenLoginAsync(string refreshToken);
-        Task<Response<NoContentDto>> RevokeRefreshTokenAsync(string refreshToken);
+        Task<ServiceResponse<LoginResultDTO>> LoginAsync(LoginDTO loginDto);
+        Task<ServiceResponse<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role);
+        Task<ServiceResponse<LoginResultDTO>> RefreshTokenLoginAsync(string refreshToken);
+        Task<ServiceResponse<bool>> RevokeRefreshTokenAsync(string refreshToken);
     }
 }

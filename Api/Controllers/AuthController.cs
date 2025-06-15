@@ -1,9 +1,10 @@
 ﻿using BusinessLogicLayer.Abstact;
+using Entity.DTOs;
 using Entity.DTOs.Common;
-using Entity.DTOs.PatientDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Threading.Tasks;
 
 namespace Api.Controllers
@@ -13,24 +14,28 @@ namespace Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthanticateService _authService;
-        private readonly IPatientService _patientService;
-
-        public AuthController(IAuthanticateService authService, IPatientService patientService)
+        
+        // IPatientService dependency removed as patient registration should be handled in PatientController
+        public AuthController(IAuthanticateService authService)
         {
             _authService = authService;
-            _patientService = patientService;
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDTO loginDto)
         {
             var result = await _authService.LoginAsync(loginDto);
-            if (result.IsSuccessful)
+            if (result.IsSuccess)
             {
-                SetRefreshTokenToCookie(result.Data.RefreshToken);
-                return Ok(result.Data);
+                // Set the cookie with the expiration time from the result DTO
+                SetRefreshTokenToCookie(result.Data.TokenInfo.RefreshToken, result.Data.RefreshTokenExpirationTime);
+                
+                // Create a new response for the frontend that only contains the safe-to-display TokenDTO
+                var frontendResponse = ServiceResponse<TokenDTO>.Success(result.Data.TokenInfo);
+                return Ok(frontendResponse);
             }
-            return BadRequest(result.Errors);
+            // Use Unauthorized for login failures
+            return Unauthorized(result);
         }
 
         [HttpPost("register")]
@@ -38,13 +43,18 @@ namespace Api.Controllers
         public async Task<IActionResult> Register(RegisterDTO registerDto, [FromQuery] string role = "Patient")
         {
             var result = await _authService.RegisterAsync(registerDto, role);
-            if (result.IsSuccessful)
+            if (result.IsSuccess)
             {
-                return Created(nameof(Register), result.Data);
+                // Return 201 Created with the response object
+                return Created(nameof(Register), result);
             }
-            return BadRequest(result.Errors);
+            // Use BadRequest for validation or other registration errors
+            return BadRequest(result);
         }
 
+        /* 
+        // This endpoint should be in PatientController.
+        // Temporarily commented out.
         [HttpPost("register-patient")]
         public async Task<IActionResult> RegisterPatient(PatientRegisterDto registerDto)
         {
@@ -55,43 +65,52 @@ namespace Api.Controllers
             }
             return BadRequest(result.Errors);
         }
+        */
 
         [HttpPost("refresh")]
         public async Task<IActionResult> RefreshToken()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-            var result = await _authService.RefreshTokenLoginAsync(refreshToken);
-            if (result.IsSuccessful)
+            if (string.IsNullOrEmpty(refreshToken))
             {
-                SetRefreshTokenToCookie(result.Data.RefreshToken);
-                return Ok(result.Data);
+                return Unauthorized(ServiceResponse<TokenDTO>.Failure("Refresh token is missing."));
             }
-            return BadRequest(result.Errors);
+            
+            var result = await _authService.RefreshTokenLoginAsync(refreshToken);
+            if (result.IsSuccess)
+            {
+                // Set the cookie with the new expiration time
+                SetRefreshTokenToCookie(result.Data.TokenInfo.RefreshToken, result.Data.RefreshTokenExpirationTime);
+
+                // Create a new response for the frontend
+                var frontendResponse = ServiceResponse<TokenDTO>.Success(result.Data.TokenInfo);
+                return Ok(frontendResponse);
+            }
+            return Unauthorized(result);
         }
 
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-            var result = await _authService.RevokeRefreshTokenAsync(refreshToken);
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                 await _authService.RevokeRefreshTokenAsync(refreshToken);
+            }
             
             // Invalidate the cookie
             Response.Cookies.Delete("refreshToken");
-
-            if (result.IsSuccessful)
-            {
-                return NoContent();
-            }
-            return BadRequest(result.Errors);
+            
+            return Ok(new { message = "Logout successful" });
         }
         
-        private void SetRefreshTokenToCookie(string refreshToken)
+        private void SetRefreshTokenToCookie(string refreshToken, DateTime expires)
         {
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Expires = System.DateTime.UtcNow.AddDays(7), // Should match refresh token's lifetime
-                Secure = true, // Should be true in production
+                Expires = expires,
+                Secure = true,
                 SameSite = SameSiteMode.Strict 
             };
             Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);

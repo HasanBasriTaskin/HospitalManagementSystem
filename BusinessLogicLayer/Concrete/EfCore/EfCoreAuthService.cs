@@ -31,27 +31,28 @@ namespace BusinessLogicLayer.Concrete.EfCore
             _tokenOptions = tokenOptions.Value;
         }
 
-        public async Task<Response<TokenDTO>> LoginAsync(LoginDTO loginDto)
+        public async Task<ServiceResponse<LoginResultDTO>> LoginAsync(LoginDTO loginDto)
         {
             if (loginDto == null || string.IsNullOrWhiteSpace(loginDto.Email) || string.IsNullOrWhiteSpace(loginDto.Password))
             {
-                return Response<TokenDTO>.Fail(400, new List<string> { "Email and password are required." });
+                return ServiceResponse<LoginResultDTO>.Failure("Email and password are required.");
             }
 
             var user = await _userManager.FindByEmailAsync(loginDto.Email);
             if (user == null || !await _userManager.CheckPasswordAsync(user, loginDto.Password))
             {
-                return Response<TokenDTO>.Fail(404, new List<string> { "Invalid email or password." });
+                return ServiceResponse<LoginResultDTO>.Failure("Invalid email or password.");
             }
 
             var accessToken = await CreateAccessToken(user);
             var newRefreshToken = CreateRefreshToken();
+            var refreshTokenExpiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
             
             var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository.FirstOrDefaultAsync(x => x.UserId == user.Id);
             if (userRefreshToken != null)
             {
                 userRefreshToken.Token = newRefreshToken;
-                userRefreshToken.Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
+                userRefreshToken.Expiration = refreshTokenExpiration;
                 _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
             }
             else
@@ -60,60 +61,75 @@ namespace BusinessLogicLayer.Concrete.EfCore
                 {
                     UserId = user.Id,
                     Token = newRefreshToken,
-                    Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration)
+                    Expiration = refreshTokenExpiration
                 });
             }
 
             await _unitOfWork.SaveChangesAsync();
             
             accessToken.RefreshToken = newRefreshToken;
-            return Response<TokenDTO>.Success(accessToken, 200);
+            
+            var loginResult = new LoginResultDTO
+            {
+                TokenInfo = accessToken,
+                RefreshTokenExpirationTime = refreshTokenExpiration
+            };
+
+            return ServiceResponse<LoginResultDTO>.Success(loginResult);
         }
 
-        public async Task<Response<TokenDTO>> RefreshTokenLoginAsync(string refreshToken)
+        public async Task<ServiceResponse<LoginResultDTO>> RefreshTokenLoginAsync(string refreshToken)
         {
             var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository
                 .FirstOrDefaultAsync(x => x.Token == refreshToken);
 
             if (userRefreshToken == null || userRefreshToken.Expiration <= DateTime.UtcNow)
             {
-                return Response<TokenDTO>.Fail(404, new List<string> { "Refresh token not found or expired." });
+                return ServiceResponse<LoginResultDTO>.Failure("Refresh token not found or expired.");
             }
 
             var user = await _userManager.FindByIdAsync(userRefreshToken.UserId);
             if (user == null)
             {
-                return Response<TokenDTO>.Fail(404, new List<string> { "User not found." });
+                return ServiceResponse<LoginResultDTO>.Failure("User not found.");
             }
 
             // Token Rotation
             var newAccessToken = await CreateAccessToken(user);
             var newRefreshToken = CreateRefreshToken();
+            var newRefreshTokenExpiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
             
             userRefreshToken.Token = newRefreshToken;
-            userRefreshToken.Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
+            userRefreshToken.Expiration = newRefreshTokenExpiration;
 
             _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
             await _unitOfWork.SaveChangesAsync();
             
             newAccessToken.RefreshToken = newRefreshToken;
-            return Response<TokenDTO>.Success(newAccessToken, 200);
+
+            var loginResult = new LoginResultDTO
+            {
+                TokenInfo = newAccessToken,
+                RefreshTokenExpirationTime = newRefreshTokenExpiration
+            };
+
+            return ServiceResponse<LoginResultDTO>.Success(loginResult);
         }
 
-        public async Task<Response<NoContentDto>> RevokeRefreshTokenAsync(string refreshToken)
+        public async Task<ServiceResponse<bool>> RevokeRefreshTokenAsync(string refreshToken)
         {
             var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository
                 .FirstOrDefaultAsync(x => x.Token == refreshToken);
 
             if (userRefreshToken == null)
             {
-                return Response<NoContentDto>.Fail(404, new List<string> { "Refresh token not found." });
+                return ServiceResponse<bool>.Failure("Refresh token not found.");
             }
 
             _unitOfWork.UserRefreshTokenRepository.Delete(userRefreshToken);
             await _unitOfWork.SaveChangesAsync();
 
-            return Response<NoContentDto>.Success(new NoContentDto(), 204);
+            return ServiceResponse<bool>.Success(true);
         }
 
         private async Task<TokenDTO> CreateAccessToken(AppUser user)
@@ -159,7 +175,7 @@ namespace BusinessLogicLayer.Concrete.EfCore
             return Convert.ToBase64String(randomNumber);
         }
 
-        public async Task<Response<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role)
+        public async Task<ServiceResponse<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role)
         {
             var user = new AppUser { Email = registerDto.Email, UserName = registerDto.Email };
             var result = await _userManager.CreateAsync(user, registerDto.Password);
@@ -167,13 +183,13 @@ namespace BusinessLogicLayer.Concrete.EfCore
             if (!result.Succeeded)
             {
                 var errors = result.Errors.Select(e => e.Description).ToList();
-                return Response<UserDTO>.Fail(400, errors);
+                return ServiceResponse<UserDTO>.Failure(errors);
             }
 
             await _userManager.AddToRoleAsync(user, role);
 
             var userDto = new UserDTO { Id = user.Id, Email = user.Email };
-            return Response<UserDTO>.Success(userDto, 201);
+            return ServiceResponse<UserDTO>.Success(userDto);
         }
     }
 }
