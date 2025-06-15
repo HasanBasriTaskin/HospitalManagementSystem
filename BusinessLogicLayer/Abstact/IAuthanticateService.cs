@@ -12,7 +12,8 @@ namespace BusinessLogicLayer.Abstact
 {
     public interface IAuthanticateService
     {
-        public Task<Response<TokenDTO>> GenerateToken(LoginDTO loginDto);
-        public Response<CookieOptions> SetCookieOptions();
+        Task<Response<TokenDTO>> LoginAsync(LoginDTO loginDto);
+        Task<Response<TokenDTO>> RefreshTokenLoginAsync(string refreshToken);
+        Task<Response<NoContentDto>> RevokeRefreshTokenAsync(string refreshToken);
     }
 }

@@ -8,7 +8,8 @@ namespace Entity.Configrations
 {
     public class CustomTokenOption
     {
-        public int ExpirationDay { get; set; }
+        public int AccessTokenExpiration { get; set; } // minutes
+        public int RefreshTokenExpiration { get; set; } // days
         public string SecurityKey { get; set; }
     }
 }

@@ -1,7 +1,9 @@
-﻿using Entity.Configrations;
-using Entity.DTOs.Common;
+﻿using BusinessLogicLayer.Abstact;
+using DataAccessLayer.Abstract;
+using Entity.Configrations;
 using Entity.DTOs;
-using Microsoft.AspNetCore.Http;
+using Entity.DTOs.Common;
+using Entity.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -10,85 +12,151 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using BusinessLogicLayer.Abstact;
 
 namespace BusinessLogicLayer.Concrete.EfCore
 {
     public class EfCoreAuthService : IAuthanticateService
     {
-        private readonly UserManager<IdentityUser> userManager;
-        private readonly CustomTokenOption tokenOptions;
+        private readonly UserManager<AppUser> _userManager;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly CustomTokenOption _tokenOptions;
 
-        public EfCoreAuthService(IOptions<CustomTokenOption> options, UserManager<IdentityUser> userManager)
+        public EfCoreAuthService(UserManager<AppUser> userManager, IUnitOfWork unitOfWork, IOptions<CustomTokenOption> tokenOptions)
         {
-            this.userManager = userManager;
-            this.tokenOptions = options.Value;
+            _userManager = userManager;
+            _unitOfWork = unitOfWork;
+            _tokenOptions = tokenOptions.Value;
         }
 
-        public async Task<Response<TokenDTO>> GenerateToken(LoginDTO loginDto)
+        public async Task<Response<TokenDTO>> LoginAsync(LoginDTO loginDto)
         {
             if (loginDto == null || string.IsNullOrWhiteSpace(loginDto.Email) || string.IsNullOrWhiteSpace(loginDto.Password))
             {
-                return Response<TokenDTO>.Fail(404, new List<string>() { "Kullanıcı bilgisi giriniz.." });
+                return Response<TokenDTO>.Fail(400, new List<string> { "Email and password are required." });
             }
-            var user = await userManager.FindByEmailAsync(loginDto.Email);
+
+            var user = await _userManager.FindByEmailAsync(loginDto.Email);
+            if (user == null || !await _userManager.CheckPasswordAsync(user, loginDto.Password))
+            {
+                return Response<TokenDTO>.Fail(404, new List<string> { "Invalid email or password." });
+            }
+
+            var accessToken = await CreateAccessToken(user);
+            var newRefreshToken = CreateRefreshToken();
+            
+            var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository.FirstOrDefaultAsync(x => x.UserId == user.Id);
+            if (userRefreshToken != null)
+            {
+                userRefreshToken.Token = newRefreshToken;
+                userRefreshToken.Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
+                _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
+            }
+            else
+            {
+                _unitOfWork.UserRefreshTokenRepository.Add(new UserRefreshToken
+                {
+                    UserId = user.Id,
+                    Token = newRefreshToken,
+                    Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration)
+                });
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            
+            accessToken.RefreshToken = newRefreshToken;
+            return Response<TokenDTO>.Success(accessToken, 200);
+        }
+
+        public async Task<Response<TokenDTO>> RefreshTokenLoginAsync(string refreshToken)
+        {
+            var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository
+                .FirstOrDefaultAsync(x => x.Token == refreshToken);
+
+            if (userRefreshToken == null || userRefreshToken.Expiration <= DateTime.UtcNow)
+            {
+                return Response<TokenDTO>.Fail(404, new List<string> { "Refresh token not found or expired." });
+            }
+
+            var user = await _userManager.FindByIdAsync(userRefreshToken.UserId);
             if (user == null)
             {
-                return Response<TokenDTO>.Fail(404, new List<string>() { "Kullanıcı adı veya şifre yanlış!" });
+                return Response<TokenDTO>.Fail(404, new List<string> { "User not found." });
             }
 
-            var passwordCheck = await userManager.CheckPasswordAsync(user, loginDto.Password);
-            if (!passwordCheck)
+            // Token Rotation
+            var newAccessToken = await CreateAccessToken(user);
+            var newRefreshToken = CreateRefreshToken();
+            
+            userRefreshToken.Token = newRefreshToken;
+            userRefreshToken.Expiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
+
+            _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
+            await _unitOfWork.SaveChangesAsync();
+            
+            newAccessToken.RefreshToken = newRefreshToken;
+            return Response<TokenDTO>.Success(newAccessToken, 200);
+        }
+
+        public async Task<Response<NoContentDto>> RevokeRefreshTokenAsync(string refreshToken)
+        {
+            var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository
+                .FirstOrDefaultAsync(x => x.Token == refreshToken);
+
+            if (userRefreshToken == null)
             {
-                return Response<TokenDTO>.Fail(404, new List<string>() { "Kullanıcı adı veya şifre yanlış!" });
+                return Response<NoContentDto>.Fail(404, new List<string> { "Refresh token not found." });
             }
 
-            var roles = await userManager.GetRolesAsync(user);
-            List<Claim> claims = new List<Claim>()
+            _unitOfWork.UserRefreshTokenRepository.Delete(userRefreshToken);
+            await _unitOfWork.SaveChangesAsync();
+
+            return Response<NoContentDto>.Success(new NoContentDto(), 204);
+        }
+
+        private async Task<TokenDTO> CreateAccessToken(AppUser user)
+        {
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Email, user.Email)
             };
-            if (roles != null)
-            {
-                claims.AddRange(roles.Select(x => new Claim(ClaimTypes.Role, x)).ToList());
-            }
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(tokenOptions.SecurityKey);
+            claims.AddRange(userRoles.Select(role => new Claim(ClaimTypes.Role, role)));
 
+            var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_tokenOptions.SecurityKey));
+            
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(tokenOptions.ExpirationDay),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                Expires = DateTime.UtcNow.AddMinutes(_tokenOptions.AccessTokenExpiration),
+                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
             };
 
+            var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
-
-            return Response<TokenDTO>.Success(new TokenDTO()
+            
+            return new TokenDTO
             {
                 Token = tokenHandler.WriteToken(token),
-                Roles = roles.ToList(),
-                User = new UserDTO()
+                ExpirationTime = tokenDescriptor.Expires.Value,
+                Roles = userRoles.ToList(),
+                 User = new UserDTO()
                 {
                     Id = user.Id,
                     Email = user.Email,
-                },
-                ExpirationTime = DateTime.UtcNow.AddDays(tokenOptions.ExpirationDay)
-            }, 200);
-        }
-        public Response<CookieOptions> SetCookieOptions()
-        {
-            var cookieOptions = new CookieOptions
-            {
-                Expires = DateTime.UtcNow.AddDays(tokenOptions.ExpirationDay),
-                HttpOnly = true,
-                SameSite = SameSiteMode.Strict,
-                Secure = true,
+                }
             };
-            return Response<CookieOptions>.Success(cookieOptions, 200);
+        }
+
+        private string CreateRefreshToken()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
         }
     }
 }
