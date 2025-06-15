@@ -158,5 +158,22 @@ namespace BusinessLogicLayer.Concrete.EfCore
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
         }
+
+        public async Task<Response<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role)
+        {
+            var user = new AppUser { Email = registerDto.Email, UserName = registerDto.Email };
+            var result = await _userManager.CreateAsync(user, registerDto.Password);
+
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return Response<UserDTO>.Fail(400, errors);
+            }
+
+            await _userManager.AddToRoleAsync(user, role);
+
+            var userDto = new UserDTO { Id = user.Id, Email = user.Email };
+            return Response<UserDTO>.Success(userDto, 201);
+        }
     }
 }

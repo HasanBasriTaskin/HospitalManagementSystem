@@ -43,6 +43,7 @@ builder.Services.AddScoped<IDoctorService, DoctorManager>();
 builder.Services.AddScoped<IPatientService, PatientManager>();
 builder.Services.AddScoped<IDoctorScheduleService, DoctorScheduleManager>();
 builder.Services.AddScoped<IAppointmentService, AppointmentManager>();
+builder.Services.AddScoped<IAuthanticateService, EfCoreAuthService>();
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogicLayer.Abstact.IDepartmentService).Assembly);
@@ -152,7 +153,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseMiddleware<JWTMiddleWare>();
 app.UseMiddleware<ExceptionMiddleWare>();
 app.UseCors("CorsPolicy");
 

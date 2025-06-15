@@ -1,55 +1,100 @@
 ﻿using BusinessLogicLayer.Abstact;
-using Entity.DTOs;
 using Entity.DTOs.Common;
+using Entity.DTOs.PatientDtos;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
 namespace Api.Controllers
 {
     [ApiController]
-    [Route("api/auth/[action]")]
-    public class AuthController : Controller
-
+    [Route("api/[controller]")]
+    public class AuthController : ControllerBase
     {
-        private readonly IAuthanticateService authanticateService;
-        private readonly UserManager<IdentityUser> userManager;
+        private readonly IAuthanticateService _authService;
+        private readonly IPatientService _patientService;
 
-        public AuthController(IAuthanticateService authanticateService, UserManager<IdentityUser> userManager
-            )
+        public AuthController(IAuthanticateService authService, IPatientService patientService)
         {
-            this.authanticateService = authanticateService;
-            this.userManager = userManager;
+            _authService = authService;
+            _patientService = patientService;
         }
-        [HttpPost]
+
+        [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDTO loginDto)
         {
-            if (!ModelState.IsValid)
+            var result = await _authService.LoginAsync(loginDto);
+            if (result.IsSuccessful)
             {
-                return BadRequest(Response<TokenDTO>.Fail(400, new List<string>() { "Kullanıcı bilgisi giriniz.." }));
+                SetRefreshTokenToCookie(result.Data.RefreshToken);
+                return Ok(result.Data);
             }
-
-            var token = await authanticateService.GenerateToken(loginDto);
-            if (token.IsSuccessful)
-            {
-                var cookieOptions = authanticateService.SetCookieOptions();
-                Response.Cookies.Append("JWTCookie", token.Data.Token, cookieOptions.Data);
-                return Ok(Response<TokenDTO>.Success(token.Data, 200));
-            }
-
-            return BadRequest(Response<TokenDTO>.Fail(400, token.Errors));
+            return BadRequest(result.Errors);
         }
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GiveRole(string email, string roleName)
+
+        [HttpPost("register")]
+        [Authorize(Roles = "Admin")] // Only admins can register new users
+        public async Task<IActionResult> Register(RegisterDTO registerDto, [FromQuery] string role = "Patient")
         {
-            var user = await userManager.FindByEmailAsync(email);
-            var result = await userManager.AddToRoleAsync(user, roleName);
-            if (result.Succeeded)
+            var result = await _authService.RegisterAsync(registerDto, role);
+            if (result.IsSuccessful)
             {
-                return Ok(result);
+                return Created(nameof(Register), result.Data);
             }
-            return BadRequest(result);
+            return BadRequest(result.Errors);
+        }
+
+        [HttpPost("register-patient")]
+        public async Task<IActionResult> RegisterPatient(PatientRegisterDto registerDto)
+        {
+            var result = await _patientService.RegisterPatientAsync(registerDto);
+            if (result.IsSuccessful)
+            {
+                return Created(nameof(RegisterPatient), result.Data);
+            }
+            return BadRequest(result.Errors);
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshToken()
+        {
+            var refreshToken = Request.Cookies["refreshToken"];
+            var result = await _authService.RefreshTokenLoginAsync(refreshToken);
+            if (result.IsSuccessful)
+            {
+                SetRefreshTokenToCookie(result.Data.RefreshToken);
+                return Ok(result.Data);
+            }
+            return BadRequest(result.Errors);
+        }
+
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            var refreshToken = Request.Cookies["refreshToken"];
+            var result = await _authService.RevokeRefreshTokenAsync(refreshToken);
+            
+            // Invalidate the cookie
+            Response.Cookies.Delete("refreshToken");
+
+            if (result.IsSuccessful)
+            {
+                return NoContent();
+            }
+            return BadRequest(result.Errors);
+        }
+        
+        private void SetRefreshTokenToCookie(string refreshToken)
+        {
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = System.DateTime.UtcNow.AddDays(7), // Should match refresh token's lifetime
+                Secure = true, // Should be true in production
+                SameSite = SameSiteMode.Strict 
+            };
+            Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
         }
     }
 }
