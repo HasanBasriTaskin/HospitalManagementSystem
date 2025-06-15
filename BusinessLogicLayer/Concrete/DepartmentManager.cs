@@ -1,6 +1,7 @@
 using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
+using Entity.DTOs;
 using Entity.DTOs.DepartmentDtos;
 using Entity.Models;
 using System;
@@ -22,75 +23,115 @@ namespace BusinessLogicLayer.Concrete
             _mapper = mapper;
         }
 
-        public async Task<DepartmentDto> CreateAsync(DepartmentCreateDto createDto)
+        public async Task<ServiceResponse<DepartmentDto>> CreateAsync(DepartmentCreateDto createDto)
         {
-            var isExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Name.ToLower() == createDto.Name.ToLower());
-            if (isExists)
+            try
             {
-                throw new InvalidOperationException("A department with this name already exists.");
+                var isExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Name.ToLower() == createDto.Name.ToLower());
+                if (isExists)
+                {
+                    return ServiceResponse<DepartmentDto>.Failure("A department with this name already exists.");
+                }
+
+                var department = _mapper.Map<Department>(createDto);
+                _unitOfWork.DepartmentRepository.Add(department);
+                await _unitOfWork.SaveChangesAsync();
+
+                var departmentDto = _mapper.Map<DepartmentDto>(department);
+                return ServiceResponse<DepartmentDto>.Success(departmentDto);
             }
-
-            var department = _mapper.Map<Department>(createDto);
-
-            _unitOfWork.DepartmentRepository.Add(department);
-            await _unitOfWork.SaveChangesAsync();
-
-            return _mapper.Map<DepartmentDto>(department);
+            catch (Exception ex)
+            {
+                return ServiceResponse<DepartmentDto>.Failure($"An error occurred while creating the department: {ex.Message}");
+            }
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task<ServiceResponse<bool>> DeleteAsync(int id)
         {
-            var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id);
-            if (department == null)
+            try
             {
-                throw new KeyNotFoundException($"Department with ID {id} not found.");
-            }
+                var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id);
+                if (department == null)
+                {
+                    return ServiceResponse<bool>.Failure($"Department with ID {id} not found.");
+                }
 
-            var hasDoctors = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.DepartmentId == id);
-            if (hasDoctors)
+                // Business Rule: A department cannot be deleted if it has doctors.
+                var hasDoctors = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.DepartmentId == id);
+                if (hasDoctors)
+                {
+                    return ServiceResponse<bool>.Failure("This department cannot be deleted because it has doctors assigned to it.");
+                }
+
+                _unitOfWork.DepartmentRepository.Delete(department);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch (Exception ex)
             {
-                throw new InvalidOperationException("This department cannot be deleted because it has doctors assigned to it.");
+                return ServiceResponse<bool>.Failure($"An error occurred while deleting the department: {ex.Message}");
             }
-
-            _unitOfWork.DepartmentRepository.Delete(department);
-            await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<DepartmentDto>> GetAllAsync()
+        public async Task<ServiceResponse<IEnumerable<DepartmentDto>>> GetAllAsync()
         {
-            var departments = await _unitOfWork.DepartmentRepository.GetAllAsync();
-            return _mapper.Map<IEnumerable<DepartmentDto>>(departments);
+            try
+            {
+                var departments = await _unitOfWork.DepartmentRepository.GetAllAsync();
+                var departmentDtos = _mapper.Map<IEnumerable<DepartmentDto>>(departments);
+                return ServiceResponse<IEnumerable<DepartmentDto>>.Success(departmentDtos);
+            }
+            catch (Exception ex)
+            {
+                return ServiceResponse<IEnumerable<DepartmentDto>>.Failure($"An error occurred while retrieving departments: {ex.Message}");
+            }
         }
 
-        public async Task<DepartmentDto> GetByIdAsync(int id)
+        public async Task<ServiceResponse<DepartmentDto>> GetByIdAsync(int id)
         {
-            var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id);
-            if (department == null)
+            try
             {
-                throw new KeyNotFoundException($"Department with ID {id} not found.");
-            }
+                var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id);
+                if (department == null)
+                {
+                    return ServiceResponse<DepartmentDto>.Failure($"Department with ID {id} not found.");
+                }
 
-            return _mapper.Map<DepartmentDto>(department);
+                var departmentDto = _mapper.Map<DepartmentDto>(department);
+                return ServiceResponse<DepartmentDto>.Success(departmentDto);
+            }
+            catch (Exception ex)
+            {
+                return ServiceResponse<DepartmentDto>.Failure($"An error occurred while retrieving the department: {ex.Message}");
+            }
         }
 
-        public async Task UpdateAsync(DepartmentUpdateDto updateDto)
+        public async Task<ServiceResponse<bool>> UpdateAsync(DepartmentUpdateDto updateDto)
         {
-            var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(updateDto.Id);
-            if (department == null)
+            try
             {
-                throw new KeyNotFoundException($"Department with ID {updateDto.Id} not found.");
-            }
+                var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(updateDto.Id);
+                if (department == null)
+                {
+                    return ServiceResponse<bool>.Failure($"Department with ID {updateDto.Id} not found.");
+                }
 
-            var isExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Name.ToLower() == updateDto.Name.ToLower() && d.Id != updateDto.Id);
-            if (isExists)
+                var isExists = await _unitOfWork.DepartmentRepository.ExistsAsync(d => d.Name.ToLower() == updateDto.Name.ToLower() && d.Id != updateDto.Id);
+                if (isExists)
+                {
+                    return ServiceResponse<bool>.Failure("A department with this name already exists.");
+                }
+
+                _mapper.Map(updateDto, department);
+                
+                _unitOfWork.DepartmentRepository.Update(department);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch (Exception ex)
             {
-                throw new InvalidOperationException("A department with this name already exists.");
+                return ServiceResponse<bool>.Failure($"An error occurred while updating the department: {ex.Message}");
             }
-
-            _mapper.Map(updateDto, department);
-            
-            _unitOfWork.DepartmentRepository.Update(department);
-            await _unitOfWork.SaveChangesAsync();
         }
     }
 } 

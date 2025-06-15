@@ -1,3 +1,4 @@
+using Entity.DTOs;
 using Entity.DTOs.DepartmentDtos;
 using System;
 using System.Collections.Generic;
@@ -9,10 +10,10 @@ namespace BusinessLogicLayer.Abstact
 {
     public interface IDepartmentService
     {
-        Task<IEnumerable<DepartmentDto>> GetAllAsync();
-        Task<DepartmentDto> GetByIdAsync(int id);
-        Task<DepartmentDto> CreateAsync(DepartmentCreateDto createDto);
-        Task UpdateAsync(DepartmentUpdateDto updateDto);
-        Task DeleteAsync(int id);
+        Task<ServiceResponse<IEnumerable<DepartmentDto>>> GetAllAsync();
+        Task<ServiceResponse<DepartmentDto>> GetByIdAsync(int id);
+        Task<ServiceResponse<DepartmentDto>> CreateAsync(DepartmentCreateDto createDto);
+        Task<ServiceResponse<bool>> UpdateAsync(DepartmentUpdateDto updateDto);
+        Task<ServiceResponse<bool>> DeleteAsync(int id);
     }
 } 
