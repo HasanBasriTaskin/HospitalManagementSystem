@@ -1,7 +1,6 @@
 ﻿using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
 using Entity.Configrations;
-using Entity.DTOs;
 using Entity.DTOs.Common;
 using Entity.Models;
 using Microsoft.AspNetCore.Identity;

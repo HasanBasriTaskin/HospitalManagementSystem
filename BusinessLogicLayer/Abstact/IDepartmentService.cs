@@ -1,4 +1,4 @@
-using Entity.DTOs;
+using Entity.DTOs.Common;
 using Entity.DTOs.DepartmentDtos;
 using System;
 using System.Collections.Generic;

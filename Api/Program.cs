@@ -11,13 +11,13 @@ using DataAccessLayer.Concrete.DatabaseFolder;
 using DataAccessLayer.Concrete.DatabaseFolder.SeedData;
 using Microsoft.AspNetCore.Diagnostics;
 using System.Text.Json;
-using Entity.DTOs;
 using DataAccessLayer.Abstract;
 using DataAccessLayer.Concrete;
 using BusinessLogicLayer.Abstact;
 using BusinessLogicLayer.Concrete;
 using Entity.Models;
 using BusinessLogicLayer.Concrete.EfCore;
+using Entity.DTOs.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,7 +1,7 @@
 using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
-using Entity.DTOs;
+using Entity.DTOs.Common;
 using Entity.DTOs.DoctorDtos;
 using Entity.Models;
 using System;

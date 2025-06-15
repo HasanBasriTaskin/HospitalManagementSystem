@@ -1,4 +1,4 @@
-using Entity.DTOs;
+using Entity.DTOs.Common;
 using Entity.DTOs.DoctorDtos;
 using System.Collections.Generic;
 using System.Threading.Tasks;

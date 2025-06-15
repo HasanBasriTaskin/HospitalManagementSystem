@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Entity.DTOs
+namespace Entity.DTOs.Common
 {
     public class ServiceResponse<T>
     {
@@ -8,48 +8,48 @@ namespace Entity.DTOs
         {
             Errors = new List<string>();
         }
-        
+
         public bool IsSuccess { get; set; }
         public T Data { get; set; }
         public List<string> Errors { get; set; }
-        
+
         // Success - for single data
         public static ServiceResponse<T> Success(T data)
         {
-            return new ServiceResponse<T> 
-            { 
-                IsSuccess = true, 
-                Data = data 
+            return new ServiceResponse<T>
+            {
+                IsSuccess = true,
+                Data = data
             };
         }
-        
+
         // Success - for void methods (no data)
         public static ServiceResponse<T> SuccessNoData()
         {
-            return new ServiceResponse<T> 
-            { 
+            return new ServiceResponse<T>
+            {
                 IsSuccess = true
             };
         }
-        
+
         // Failure - single error message
         public static ServiceResponse<T> Failure(string error)
         {
-            return new ServiceResponse<T> 
-            { 
-                IsSuccess = false, 
-                Errors = new List<string> { error } 
+            return new ServiceResponse<T>
+            {
+                IsSuccess = false,
+                Errors = new List<string> { error }
             };
         }
-        
+
         // Failure - multiple error messages
         public static ServiceResponse<T> Failure(List<string> errors)
         {
-            return new ServiceResponse<T> 
-            { 
-                IsSuccess = false, 
-                Errors = errors 
+            return new ServiceResponse<T>
+            {
+                IsSuccess = false,
+                Errors = errors
             };
         }
     }
-} 
+}

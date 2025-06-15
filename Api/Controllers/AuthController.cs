@@ -1,5 +1,4 @@
 ﻿using BusinessLogicLayer.Abstact;
-using Entity.DTOs;
 using Entity.DTOs.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

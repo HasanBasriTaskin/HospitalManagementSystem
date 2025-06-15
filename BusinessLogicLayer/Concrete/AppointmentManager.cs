@@ -1,8 +1,8 @@
 using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
-using Entity.DTOs;
 using Entity.DTOs.AppointmentDtos;
+using Entity.DTOs.Common;
 using Entity.Enums;
 using Entity.Models;
 using System;

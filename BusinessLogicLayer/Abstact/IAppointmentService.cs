@@ -1,5 +1,5 @@
-using Entity.DTOs;
 using Entity.DTOs.AppointmentDtos;
+using Entity.DTOs.Common;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
