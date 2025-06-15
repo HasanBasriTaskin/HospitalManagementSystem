@@ -17,6 +17,7 @@ namespace DataAccessLayer.Concrete
         private IAppointmentRepository? _appointmentRepository;
         private IDoctorScheduleRepository? _doctorScheduleRepository;
         private IDepartmentRepository? _departmentRepository;
+        private IUserRefreshTokenRepository _userRefreshTokenRepository;
 
         public UnitOfWork(ProjectMainContext context)
         {
@@ -38,6 +39,8 @@ namespace DataAccessLayer.Concrete
 
         public IDepartmentRepository DepartmentRepository => 
             _departmentRepository ??= new DepartmentRepository(_context);
+
+        public IUserRefreshTokenRepository UserRefreshTokenRepository => _userRefreshTokenRepository ??= new UserRefreshTokenRepository(_context);
 
         // Transaction Operations
         public async Task BeginTransactionAsync()

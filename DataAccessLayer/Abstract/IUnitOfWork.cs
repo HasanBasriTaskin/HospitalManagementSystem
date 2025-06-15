@@ -10,6 +10,7 @@ namespace DataAccessLayer.Abstract
         IAppointmentRepository AppointmentRepository { get; }
         IDoctorScheduleRepository DoctorScheduleRepository { get; }
         IDepartmentRepository DepartmentRepository { get; }
+        IUserRefreshTokenRepository UserRefreshTokenRepository { get; }
 
         // Transaction Operations
         Task BeginTransactionAsync();
