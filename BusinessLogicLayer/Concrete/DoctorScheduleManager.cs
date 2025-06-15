@@ -1,6 +1,7 @@
 using AutoMapper;
 using BusinessLogicLayer.Abstact;
 using DataAccessLayer.Abstract;
+using Entity.DTOs;
 using Entity.DTOs.DoctorScheduleDtos;
 using Entity.Models;
 using System;
@@ -21,113 +22,158 @@ namespace BusinessLogicLayer.Concrete
             _mapper = mapper;
         }
 
-        public async Task<DoctorScheduleDto> CreateAsync(DoctorScheduleCreateDto createDto)
+        public async Task<ServiceResponse<DoctorScheduleDto>> CreateAsync(DoctorScheduleCreateDto createDto)
         {
+            var validationErrors = new List<string>();
+
             // Rule 1: Doctor must exist
             var doctorExists = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.Id == createDto.DoctorId);
             if (!doctorExists)
             {
-                throw new KeyNotFoundException($"Doctor with ID {createDto.DoctorId} not found.");
+                validationErrors.Add($"Doctor with ID {createDto.DoctorId} not found.");
             }
 
             // Rule 2: EndTime must be after StartTime
             if (createDto.EndTime <= createDto.StartTime)
             {
-                throw new InvalidOperationException("End time must be after start time.");
+                validationErrors.Add("End time must be after start time.");
             }
 
-            // Rule 3: Check for overlapping schedules for the same doctor on the same day
+            // Rule 3: DayOfWeek must be valid (1-7)
+            if(createDto.DayOfWeek < 1 || createDto.DayOfWeek > 7)
+            {
+                validationErrors.Add("DayOfWeek must be between 1 (Monday) and 7 (Sunday).");
+            }
+
+            // Rule 4: Check for overlapping schedules
             var existingSchedules = await _unitOfWork.DoctorScheduleRepository.FindAsync(s => s.DoctorId == createDto.DoctorId && s.DayOfWeek == createDto.DayOfWeek);
-            var hasOverlap = existingSchedules.Any(s =>
-                createDto.StartTime < s.EndTime && createDto.EndTime > s.StartTime
-            );
-
-            if (hasOverlap)
+            if (existingSchedules.Any(s => createDto.StartTime < s.EndTime && createDto.EndTime > s.StartTime))
             {
-                throw new InvalidOperationException("The new schedule overlaps with an existing schedule for this doctor on the same day.");
+                validationErrors.Add("The new schedule overlaps with an existing schedule for this doctor on the same day.");
             }
 
-            var schedule = _mapper.Map<DoctorSchedule>(createDto);
-
-            _unitOfWork.DoctorScheduleRepository.Add(schedule);
-            await _unitOfWork.SaveChangesAsync();
-
-            return await GetByIdAsync(schedule.Id);
-        }
-
-        public async Task DeleteAsync(int id)
-        {
-            var schedule = await _unitOfWork.DoctorScheduleRepository.GetByIdAsync(id);
-            if (schedule == null)
+            if (validationErrors.Any())
             {
-                throw new KeyNotFoundException($"Schedule with ID {id} not found.");
+                return ServiceResponse<DoctorScheduleDto>.Failure(validationErrors);
             }
 
-            _unitOfWork.DoctorScheduleRepository.Delete(schedule);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        public async Task<IEnumerable<DoctorScheduleDto>> GetAllByDoctorIdAsync(int doctorId)
-        {
-            var schedules = await _unitOfWork.DoctorScheduleRepository.FindAsync(s => s.DoctorId == doctorId);
-            return _mapper.Map<IEnumerable<DoctorScheduleDto>>(schedules);
-        }
-
-        public async Task<DoctorScheduleDto> GetByIdAsync(int id)
-        {
-            var schedule = await _unitOfWork.DoctorScheduleRepository.GetByIdAsync(id);
-            if (schedule == null)
+            try
             {
-                throw new KeyNotFoundException($"Schedule with ID {id} not found.");
+                var schedule = _mapper.Map<DoctorSchedule>(createDto);
+                _unitOfWork.DoctorScheduleRepository.Add(schedule);
+                await _unitOfWork.SaveChangesAsync();
+                return await GetByIdAsync(schedule.Id);
             }
-
-            // Manually load doctor for mapping DoctorFullName
-            var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(schedule.DoctorId);
-            var scheduleDto = _mapper.Map<DoctorScheduleDto>(schedule);
-            if (doctor != null)
+            catch(Exception ex)
             {
-                scheduleDto.DoctorFullName = doctor.FullName;
+                return ServiceResponse<DoctorScheduleDto>.Failure($"An error occurred while creating the schedule: {ex.Message}");
             }
-
-            return scheduleDto;
         }
 
-        public async Task UpdateAsync(DoctorScheduleUpdateDto updateDto)
+        public async Task<ServiceResponse<bool>> DeleteAsync(int id)
         {
+            try
+            {
+                var schedule = await _unitOfWork.DoctorScheduleRepository.GetByIdAsync(id);
+                if (schedule == null)
+                {
+                    return ServiceResponse<bool>.Failure($"Schedule with ID {id} not found.");
+                }
+
+                _unitOfWork.DoctorScheduleRepository.Delete(schedule);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<bool>.Failure($"An error occurred while deleting the schedule: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResponse<IEnumerable<DoctorScheduleDto>>> GetAllByDoctorIdAsync(int doctorId)
+        {
+            try
+            {
+                var schedules = await _unitOfWork.DoctorScheduleRepository.FindAsync(s => s.DoctorId == doctorId);
+                var scheduleDtos = _mapper.Map<IEnumerable<DoctorScheduleDto>>(schedules);
+                return ServiceResponse<IEnumerable<DoctorScheduleDto>>.Success(scheduleDtos);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<IEnumerable<DoctorScheduleDto>>.Failure($"An error occurred while retrieving schedules: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResponse<DoctorScheduleDto>> GetByIdAsync(int id)
+        {
+            try
+            {
+                var schedule = await _unitOfWork.DoctorScheduleRepository.GetByIdAsync(id);
+                if (schedule == null)
+                {
+                    return ServiceResponse<DoctorScheduleDto>.Failure($"Schedule with ID {id} not found.");
+                }
+
+                var doctor = await _unitOfWork.DoctorRepository.GetByIdAsync(schedule.DoctorId);
+                var scheduleDto = _mapper.Map<DoctorScheduleDto>(schedule);
+                if (doctor != null)
+                {
+                    scheduleDto.DoctorFullName = doctor.FullName;
+                }
+
+                return ServiceResponse<DoctorScheduleDto>.Success(scheduleDto);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<DoctorScheduleDto>.Failure($"An error occurred while retrieving the schedule: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResponse<bool>> UpdateAsync(DoctorScheduleUpdateDto updateDto)
+        {
+            var validationErrors = new List<string>();
+
             var schedule = await _unitOfWork.DoctorScheduleRepository.GetByIdAsync(updateDto.Id);
             if (schedule == null)
             {
-                throw new KeyNotFoundException($"Schedule with ID {updateDto.Id} not found.");
+                return ServiceResponse<bool>.Failure($"Schedule with ID {updateDto.Id} not found.");
             }
 
-            // Rule 1: Doctor must exist
-            var doctorExists = await _unitOfWork.DoctorRepository.ExistsAsync(d => d.Id == updateDto.DoctorId);
-            if (!doctorExists)
-            {
-                throw new KeyNotFoundException($"Doctor with ID {updateDto.DoctorId} not found.");
-            }
-
-            // Rule 2: EndTime must be after StartTime
+            // Rule 1: EndTime must be after StartTime
             if (updateDto.EndTime <= updateDto.StartTime)
             {
-                throw new InvalidOperationException("End time must be after start time.");
+                validationErrors.Add("End time must be after start time.");
             }
 
-            // Rule 3: Check for overlapping schedules, excluding the current one being updated
-            var existingSchedules = await _unitOfWork.DoctorScheduleRepository.FindAsync(s => s.DoctorId == updateDto.DoctorId && s.DayOfWeek == updateDto.DayOfWeek && s.Id != updateDto.Id);
-            var hasOverlap = existingSchedules.Any(s =>
-                updateDto.StartTime < s.EndTime && updateDto.EndTime > s.StartTime
-            );
-
-            if (hasOverlap)
+            // Rule 2: DayOfWeek must be valid (1-7)
+            if(updateDto.DayOfWeek < 1 || updateDto.DayOfWeek > 7)
             {
-                throw new InvalidOperationException("The updated schedule overlaps with another existing schedule for this doctor on the same day.");
+                validationErrors.Add("DayOfWeek must be between 1 (Monday) and 7 (Sunday).");
             }
 
-            _mapper.Map(updateDto, schedule);
+            // Rule 3: Check for overlapping schedules, excluding the current one
+            var existingSchedules = await _unitOfWork.DoctorScheduleRepository.FindAsync(s => s.DoctorId == schedule.DoctorId && s.DayOfWeek == updateDto.DayOfWeek && s.Id != updateDto.Id);
+            if (existingSchedules.Any(s => updateDto.StartTime < s.EndTime && updateDto.EndTime > s.StartTime))
+            {
+                validationErrors.Add("The updated schedule overlaps with another existing schedule for this doctor on the same day.");
+            }
 
-            _unitOfWork.DoctorScheduleRepository.Update(schedule);
-            await _unitOfWork.SaveChangesAsync();
+            if (validationErrors.Any())
+            {
+                return ServiceResponse<bool>.Failure(validationErrors);
+            }
+            
+            try
+            {
+                _mapper.Map(updateDto, schedule);
+                _unitOfWork.DoctorScheduleRepository.Update(schedule);
+                await _unitOfWork.SaveChangesAsync();
+                return ServiceResponse<bool>.Success(true);
+            }
+            catch(Exception ex)
+            {
+                return ServiceResponse<bool>.Failure($"An error occurred while updating the schedule: {ex.Message}");
+            }
         }
     }
 } 

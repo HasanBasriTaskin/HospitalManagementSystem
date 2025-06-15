@@ -1,3 +1,4 @@
+using Entity.DTOs;
 using Entity.DTOs.DoctorScheduleDtos;
 using System;
 using System.Collections.Generic;
@@ -9,10 +10,10 @@ namespace BusinessLogicLayer.Abstact
 {
     public interface IDoctorScheduleService
     {
-        Task<IEnumerable<DoctorScheduleDto>> GetAllByDoctorIdAsync(int doctorId);
-        Task<DoctorScheduleDto> GetByIdAsync(int id);
-        Task<DoctorScheduleDto> CreateAsync(DoctorScheduleCreateDto createDto);
-        Task UpdateAsync(DoctorScheduleUpdateDto updateDto);
-        Task DeleteAsync(int id);
+        Task<ServiceResponse<IEnumerable<DoctorScheduleDto>>> GetAllByDoctorIdAsync(int doctorId);
+        Task<ServiceResponse<DoctorScheduleDto>> GetByIdAsync(int id);
+        Task<ServiceResponse<DoctorScheduleDto>> CreateAsync(DoctorScheduleCreateDto createDto);
+        Task<ServiceResponse<bool>> UpdateAsync(DoctorScheduleUpdateDto updateDto);
+        Task<ServiceResponse<bool>> DeleteAsync(int id);
     }
 } 
