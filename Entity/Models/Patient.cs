@@ -52,5 +52,6 @@ namespace Entity.Models
         
         // Navigation Properties
         public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+        public virtual AppUser AppUser { get; set; }
     }
 } 

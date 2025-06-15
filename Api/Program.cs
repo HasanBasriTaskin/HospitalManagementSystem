@@ -16,6 +16,7 @@ using DataAccessLayer.Abstract;
 using DataAccessLayer.Concrete;
 using BusinessLogicLayer.Abstact;
 using BusinessLogicLayer.Concrete;
+using Entity.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,7 +76,7 @@ builder.Services.AddDbContext<ProjectMainContext>(opt =>
     }
 });
 
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+builder.Services.AddIdentity<AppUser, IdentityRole>()
     .AddEntityFrameworkStores<ProjectMainContext>()
     .AddDefaultTokenProviders();
 

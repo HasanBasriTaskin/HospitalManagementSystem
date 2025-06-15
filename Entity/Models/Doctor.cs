@@ -41,5 +41,6 @@ namespace Entity.Models
         public virtual Department Department { get; set; } = null!;
         public virtual ICollection<DoctorSchedule> DoctorSchedules { get; set; } = new List<DoctorSchedule>();
         public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+        public virtual AppUser AppUser { get; set; }
     }
 } 

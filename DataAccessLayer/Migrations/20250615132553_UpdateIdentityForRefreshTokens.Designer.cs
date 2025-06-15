@@ -3,6 +3,7 @@ using System;
 using DataAccessLayer.Concrete.DatabaseFolder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccessLayer.Migrations
 {
     [DbContext(typeof(ProjectMainContext))]
-    partial class ProjectMainContextModelSnapshot : ModelSnapshot
+    [Migration("20250615132553_UpdateIdentityForRefreshTokens")]
+    partial class UpdateIdentityForRefreshTokens
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.4");
@@ -28,9 +31,6 @@ namespace DataAccessLayer.Migrations
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
-
-                    b.Property<int?>("DoctorId")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -56,9 +56,6 @@ namespace DataAccessLayer.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("PatientId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("TEXT");
 
@@ -77,18 +74,12 @@ namespace DataAccessLayer.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DoctorId")
-                        .IsUnique();
-
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
-
-                    b.HasIndex("PatientId")
-                        .IsUnique();
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -534,21 +525,6 @@ namespace DataAccessLayer.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Entity.Models.AppUser", b =>
-                {
-                    b.HasOne("Entity.Models.Doctor", "Doctor")
-                        .WithOne("AppUser")
-                        .HasForeignKey("Entity.Models.AppUser", "DoctorId");
-
-                    b.HasOne("Entity.Models.Patient", "Patient")
-                        .WithOne("AppUser")
-                        .HasForeignKey("Entity.Models.AppUser", "PatientId");
-
-                    b.Navigation("Doctor");
-
-                    b.Navigation("Patient");
-                });
-
             modelBuilder.Entity("Entity.Models.Appointment", b =>
                 {
                     b.HasOne("Entity.Models.Doctor", "Doctor")
@@ -664,9 +640,6 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("Entity.Models.Doctor", b =>
                 {
-                    b.Navigation("AppUser")
-                        .IsRequired();
-
                     b.Navigation("Appointments");
 
                     b.Navigation("DoctorSchedules");
@@ -674,9 +647,6 @@ namespace DataAccessLayer.Migrations
 
             modelBuilder.Entity("Entity.Models.Patient", b =>
                 {
-                    b.Navigation("AppUser")
-                        .IsRequired();
-
                     b.Navigation("Appointments");
                 });
 #pragma warning restore 612, 618

@@ -5,7 +5,7 @@ using Entity.Models;
 
 namespace DataAccessLayer.Concrete.DatabaseFolder
 {
-    public class ProjectMainContext : IdentityDbContext<IdentityUser>
+    public class ProjectMainContext : IdentityDbContext<AppUser>
     {
         public ProjectMainContext(DbContextOptions<ProjectMainContext> options) : base(options)
         {
@@ -17,6 +17,7 @@ namespace DataAccessLayer.Concrete.DatabaseFolder
         public DbSet<Patient> Patients { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
         public DbSet<DoctorSchedule> DoctorSchedules { get; set; }
+        public DbSet<UserRefreshToken> UserRefreshTokens { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -32,6 +33,36 @@ namespace DataAccessLayer.Concrete.DatabaseFolder
             ConfigurePatient(modelBuilder);
             ConfigureDoctorSchedule(modelBuilder);
             ConfigureAppointment(modelBuilder);
+            ConfigureUserRefreshToken(modelBuilder);
+            ConfigureAppUser(modelBuilder);
+        }
+
+        private static void ConfigureAppUser(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<AppUser>(entity =>
+            {
+                entity.HasOne(u => u.Doctor)
+                    .WithOne(d => d.AppUser)
+                    .HasForeignKey<AppUser>(u => u.DoctorId)
+                    .IsRequired(false);
+
+                entity.HasOne(u => u.Patient)
+                    .WithOne(p => p.AppUser)
+                    .HasForeignKey<AppUser>(u => u.PatientId)
+                    .IsRequired(false);
+            });
+        }
+
+        private static void ConfigureUserRefreshToken(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<UserRefreshToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Token).IsRequired();
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.UserRefreshTokens)
+                      .HasForeignKey(e => e.UserId);
+            });
         }
 
         private static void ConfigureDepartment(ModelBuilder modelBuilder)
