@@ -1,5 +1,6 @@
 ﻿using BusinessLogicLayer.Abstact;
 using Entity.DTOs.Common;
+using Entity.DTOs.DoctorDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -37,34 +38,17 @@ namespace Api.Controllers
             return Unauthorized(result);
         }
 
-        [HttpPost("register")]
-        [Authorize(Roles = "Admin")] // Only admins can register new users
-        public async Task<IActionResult> Register(RegisterDTO registerDto, [FromQuery] string role = "Patient")
+        [HttpPost("register-doctor")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> RegisterDoctor(DoctorRegisterDTO doctorRegisterDto)
         {
-            var result = await _authService.RegisterAsync(registerDto, role);
+            var result = await _authService.RegisterDoctorAsync(doctorRegisterDto);
             if (result.IsSuccess)
             {
-                // Return 201 Created with the response object
-                return Created(nameof(Register), result);
+                return Created(nameof(RegisterDoctor), result);
             }
-            // Use BadRequest for validation or other registration errors
             return BadRequest(result);
         }
-
-        /* 
-        // This endpoint should be in PatientController.
-        // Temporarily commented out.
-        [HttpPost("register-patient")]
-        public async Task<IActionResult> RegisterPatient(PatientRegisterDto registerDto)
-        {
-            var result = await _patientService.RegisterPatientAsync(registerDto);
-            if (result.IsSuccessful)
-            {
-                return Created(nameof(RegisterPatient), result.Data);
-            }
-            return BadRequest(result.Errors);
-        }
-        */
 
         [HttpPost("refresh")]
         public async Task<IActionResult> RefreshToken()

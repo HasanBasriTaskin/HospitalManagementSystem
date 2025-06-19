@@ -2,6 +2,7 @@
 using DataAccessLayer.Abstract;
 using Entity.Configrations;
 using Entity.DTOs.Common;
+using Entity.DTOs.DoctorDtos;
 using Entity.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
@@ -174,21 +175,60 @@ namespace BusinessLogicLayer.Concrete.EfCore
             return Convert.ToBase64String(randomNumber);
         }
 
-        public async Task<ServiceResponse<UserDTO>> RegisterAsync(RegisterDTO registerDto, string role)
+        public async Task<ServiceResponse<UserDTO>> RegisterDoctorAsync(DoctorRegisterDTO dto)
         {
-            var user = new AppUser { Email = registerDto.Email, UserName = registerDto.Email };
-            var result = await _userManager.CreateAsync(user, registerDto.Password);
-
-            if (!result.Succeeded)
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                var errors = result.Errors.Select(e => e.Description).ToList();
-                return ServiceResponse<UserDTO>.Failure(errors);
+                // Create Doctor entity
+                var doctor = new Doctor
+                {
+                    FirstName = dto.FirstName,
+                    LastName = dto.LastName,
+                    Title = dto.Title,
+                    DepartmentId = dto.DepartmentId,
+                    LicenseNumber = dto.LicenseNumber,
+                    Phone = dto.Phone,
+                    Email = dto.Email,
+                };
+
+                // Create AppUser entity and link it to the Doctor
+                var appUser = new AppUser
+                {
+                    Email = dto.Email,
+                    UserName = dto.Email,
+                    Doctor = doctor 
+                };
+
+                // Create the user in Identity
+                var identityResult = await _userManager.CreateAsync(appUser, dto.Password);
+                if (!identityResult.Succeeded)
+                {
+                    var errors = identityResult.Errors.Select(e => e.Description).ToList();
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return ServiceResponse<UserDTO>.Failure(errors);
+                }
+
+                // Assign the "Doctor" role
+                var roleResult = await _userManager.AddToRoleAsync(appUser, "Doctor");
+                if (!roleResult.Succeeded)
+                {
+                    var errors = roleResult.Errors.Select(e => e.Description).ToList();
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return ServiceResponse<UserDTO>.Failure(errors);
+                }
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                var userDto = new UserDTO { Id = appUser.Id, Email = appUser.Email };
+                return ServiceResponse<UserDTO>.Success(userDto);
             }
-
-            await _userManager.AddToRoleAsync(user, role);
-
-            var userDto = new UserDTO { Id = user.Id, Email = user.Email };
-            return ServiceResponse<UserDTO>.Success(userDto);
+            catch (Exception ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                // Optionally log the exception ex
+                return ServiceResponse<UserDTO>.Failure("An unexpected error occurred during registration.");
+            }
         }
     }
 }
