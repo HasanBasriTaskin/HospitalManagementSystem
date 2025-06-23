@@ -47,7 +47,7 @@ namespace BusinessLogicLayer.Concrete.EfCore
             var accessToken = await CreateAccessToken(user);
             var newRefreshToken = CreateRefreshToken();
             var refreshTokenExpiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
-            
+
             var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository.FirstOrDefaultAsync(x => x.UserId == user.Id);
             if (userRefreshToken != null)
             {
@@ -66,9 +66,9 @@ namespace BusinessLogicLayer.Concrete.EfCore
             }
 
             await _unitOfWork.SaveChangesAsync();
-            
+
             accessToken.RefreshToken = newRefreshToken;
-            
+
             var loginResult = new LoginResultDTO
             {
                 TokenInfo = accessToken,
@@ -98,13 +98,13 @@ namespace BusinessLogicLayer.Concrete.EfCore
             var newAccessToken = await CreateAccessToken(user);
             var newRefreshToken = CreateRefreshToken();
             var newRefreshTokenExpiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
-            
+
             userRefreshToken.Token = newRefreshToken;
             userRefreshToken.Expiration = newRefreshTokenExpiration;
 
             _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
             await _unitOfWork.SaveChangesAsync();
-            
+
             newAccessToken.RefreshToken = newRefreshToken;
 
             var loginResult = new LoginResultDTO
@@ -143,7 +143,7 @@ namespace BusinessLogicLayer.Concrete.EfCore
             claims.AddRange(userRoles.Select(role => new Claim(ClaimTypes.Role, role)));
 
             var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_tokenOptions.SecurityKey));
-            
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
@@ -153,13 +153,13 @@ namespace BusinessLogicLayer.Concrete.EfCore
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            
+
             return new TokenDTO
             {
                 Token = tokenHandler.WriteToken(token),
                 ExpirationTime = tokenDescriptor.Expires.Value,
                 Roles = userRoles.ToList(),
-                 User = new UserDTO()
+                User = new UserDTO()
                 {
                     Id = user.Id,
                     Email = user.Email,
@@ -197,7 +197,7 @@ namespace BusinessLogicLayer.Concrete.EfCore
                 {
                     Email = dto.Email,
                     UserName = dto.Email,
-                    Doctor = doctor 
+                    Doctor = doctor
                 };
 
                 // Create the user in Identity
@@ -229,6 +229,58 @@ namespace BusinessLogicLayer.Concrete.EfCore
                 // Optionally log the exception ex
                 return ServiceResponse<UserDTO>.Failure("An unexpected error occurred during registration.");
             }
+        }
+
+        public async Task<ServiceResponse<LoginResultDTO>> LoginDoctorAsync(LoginDTO loginDto)
+        {
+            if (loginDto == null || string.IsNullOrWhiteSpace(loginDto.Email) || string.IsNullOrWhiteSpace(loginDto.Password))
+            {
+                return ServiceResponse<LoginResultDTO>.Failure("Email and password are required.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(loginDto.Email);
+            if (user == null || !await _userManager.CheckPasswordAsync(user, loginDto.Password))
+            {
+                return ServiceResponse<LoginResultDTO>.Failure("Invalid email or password.");
+            }
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains("Doctor"))
+            {
+                return ServiceResponse<LoginResultDTO>.Failure("This login is for doctors only.");
+            }
+
+            var accessToken = await CreateAccessToken(user);
+            var newRefreshToken = CreateRefreshToken();
+            var refreshTokenExpiration = DateTime.UtcNow.AddDays(_tokenOptions.RefreshTokenExpiration);
+
+            var userRefreshToken = await _unitOfWork.UserRefreshTokenRepository.FirstOrDefaultAsync(x => x.UserId == user.Id);
+            if (userRefreshToken != null)
+            {
+                userRefreshToken.Token = newRefreshToken;
+                userRefreshToken.Expiration = refreshTokenExpiration;
+                _unitOfWork.UserRefreshTokenRepository.Update(userRefreshToken);
+            }
+            else
+            {
+                _unitOfWork.UserRefreshTokenRepository.Add(new UserRefreshToken
+                {
+                    UserId = user.Id,
+                    Token = newRefreshToken,
+                    Expiration = refreshTokenExpiration
+                });
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            accessToken.RefreshToken = newRefreshToken;
+
+            var loginResult = new LoginResultDTO
+            {
+                TokenInfo = accessToken,
+                RefreshTokenExpirationTime = refreshTokenExpiration
+            };
+
+            return ServiceResponse<LoginResultDTO>.Success(loginResult);
         }
     }
 }

@@ -49,7 +49,22 @@ namespace Api.Controllers
             }
             return BadRequest(result);
         }
+        [HttpPost("login-doctor")]
+        [AllowAnonymous]
+        public async Task<IActionResult> LoginDoctor(LoginDTO doctorLoginDTO)
+        {
+            var result = await _authService.LoginDoctorAsync(doctorLoginDTO);
+            if (result.IsSuccess)
+            {
+                // Set the cookie with the expiration time from the result DTO
+                SetRefreshTokenToCookie(result.Data.TokenInfo.RefreshToken, result.Data.RefreshTokenExpirationTime);
 
+                // Create a new response for the frontend that only contains the safe-to-display TokenDTO
+                var frontendResponse = ServiceResponse<TokenDTO>.Success(result.Data.TokenInfo);
+                return Ok(frontendResponse);
+            }
+            return BadRequest(result);
+        }
         [HttpPost("refresh")]
         public async Task<IActionResult> RefreshToken()
         {

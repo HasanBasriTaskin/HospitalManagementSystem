@@ -17,5 +17,6 @@ namespace BusinessLogicLayer.Abstact
         Task<ServiceResponse<LoginResultDTO>> RefreshTokenLoginAsync(string refreshToken);
         Task<ServiceResponse<bool>> RevokeRefreshTokenAsync(string refreshToken);
         Task<ServiceResponse<UserDTO>> RegisterDoctorAsync(DoctorRegisterDTO doctorRegisterDto);
+        Task<ServiceResponse<LoginResultDTO>> LoginDoctorAsync(LoginDTO loginDto);
     }
 }
