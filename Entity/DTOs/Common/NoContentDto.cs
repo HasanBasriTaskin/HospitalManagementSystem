@@ -1,6 +1,6 @@
 namespace Entity.DTOs.Common
 {
-    public class NoContentDto
+    public class NoContentDTO
     {
     }
 } 
