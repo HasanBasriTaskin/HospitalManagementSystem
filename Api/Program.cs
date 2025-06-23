@@ -129,7 +129,7 @@ builder.Services.AddMvc().ConfigureApiBehaviorOptions(options =>
 
 var app = builder.Build();
 
-// Create and seed the database
+// Create and seed the database only develepment environment();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -143,9 +143,12 @@ using (var scope = app.Services.CreateScope())
             context.Database.Migrate();
         }
 
-        // Seed the database
-        var seeder = new DatabaseSeeder(context);
-        await seeder.SeedAsync();
+        if (app.Environment.IsDevelopment())
+        {
+            // Seed the database
+            var seeder = new DatabaseSeeder(context);
+            await seeder.SeedAsync();
+        }
     }
     catch (Exception ex)
     {
